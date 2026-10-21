@@ -36,6 +36,7 @@ public partial class App : Application
         AppPaths.EnsureDirectories();
 
         Settings = Config.Load(AppPaths.ConfigFile);
+        LauncherState.Bootstrap();
 
         string applied = ThemeService.Apply(Settings.ThemeId);
         if (!string.Equals(applied, Settings.ThemeId, StringComparison.OrdinalIgnoreCase))

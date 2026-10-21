@@ -4,11 +4,10 @@
         xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
         xmlns:ui="clr-namespace:CookieLauncher.UI"
         Title="Cookie Launcher"
-        Width="1240"
-        Height="820"
-        MinWidth="1000"
-        MinHeight="680"
+        Width="1040"
+        Height="680"
         WindowStyle="None"
+        ResizeMode="NoResize"
         WindowStartupLocation="CenterScreen"
         Background="Transparent"
         UseLayoutRounding="True"
@@ -40,12 +39,12 @@
         <Grid>
             <Grid.RowDefinitions>
                 <!-- M3 top app bar: 64dp -->
-                <RowDefinition Height="64" />
+                <RowDefinition Height="56" />
                 <RowDefinition Height="*" />
             </Grid.RowDefinitions>
             <Grid.ColumnDefinitions>
                 <!-- M3 navigation rail: 232dp with label, comfortably above the 80dp minimum -->
-                <ColumnDefinition Width="88" />
+                <ColumnDefinition Width="80" />
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
 
@@ -119,7 +118,7 @@
                         <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
 
-                    <StackPanel Grid.Row="0" Margin="8,16,8,0">
+                    <StackPanel Grid.Row="0" Margin="4,14,4,0">
                         <RadioButton x:Name="NavPlay"
                                      Style="{StaticResource MdNavRailItem}"
                                      Tag="home"
