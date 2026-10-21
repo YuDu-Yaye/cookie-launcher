@@ -1,0 +1,24 @@
+# Build output
+build/
+out/
+dist/
+*.class
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.settings/
+.project
+.classpath
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Launcher data (portable mode marker is committed, data is not)
+data/
+*.log
+
+# Research scratch
+.research/

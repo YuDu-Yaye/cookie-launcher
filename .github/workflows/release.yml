@@ -1,0 +1,139 @@
+name: release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to build (e.g. 1.0.0)'
+        required: true
+        default: '1.0.0'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            name: windows
+            artifact: cookie-launcher-windows
+          - os: macos-latest
+            name: macos
+            artifact: cookie-launcher-macos
+          - os: ubuntu-latest
+            name: linux
+            artifact: cookie-launcher-linux
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Run tests and build the jar
+        shell: bash
+        run: bash scripts/build.sh
+
+      - name: Build native app image
+        shell: bash
+        run: |
+          mkdir -p build/app
+          jpackage \
+            --type app-image \
+            --name CookieLauncher \
+            --input build/dist \
+            --main-jar cookie-launcher.jar \
+            --main-class dev.cookielauncher.Main \
+            --dest build/app \
+            --java-options "-XX:+UseG1GC" \
+            --java-options "-Dfile.encoding=UTF-8" \
+            --java-options "-Dsun.java2d.uiScale.enabled=true" \
+            --app-version "${{ github.event.inputs.version || '1.0.0' }}" \
+            --vendor "Cookie Launcher contributors" \
+            --description "Open source Minecraft: Java Edition launcher"
+
+      - name: Package (Windows)
+        if: matrix.name == 'windows'
+        shell: pwsh
+        run: |
+          $version = "${{ github.event.inputs.version || '1.0.0' }}"
+          $dest = "cookie-launcher-$version-windows"
+          Compress-Archive -Path build/app/CookieLauncher/* -DestinationPath "$dest.zip"
+          Copy-Item build/dist/cookie-launcher.jar .
+          Write-Output "PACKAGED=$dest.zip" >> $env:GITHUB_ENV
+
+      - name: Package (macOS)
+        if: matrix.name == 'macos'
+        shell: bash
+        run: |
+          version="${{ github.event.inputs.version || '1.0.0' }}"
+          dest="cookie-launcher-${version}-macos"
+          mkdir -p "$dest"
+          cp -R "build/app/CookieLauncher.app" "$dest/" 2>/dev/null \
+            || cp -R build/app/CookieLauncher/* "$dest/"
+          zip -qry "$dest.zip" "$dest"
+          cp build/dist/cookie-launcher.jar .
+          echo "PACKAGED=$dest.zip" >> "$GITHUB_ENV"
+
+      - name: Package (Linux)
+        if: matrix.name == 'linux'
+        shell: bash
+        run: |
+          version="${{ github.event.inputs.version || '1.0.0' }}"
+          dest="cookie-launcher-${version}-linux"
+          mkdir -p "$dest"
+          cp -R build/app/CookieLauncher/* "$dest/"
+          tar -czf "$dest.tar.gz" "$dest"
+          cp build/dist/cookie-launcher.jar .
+          echo "PACKAGED=$dest.tar.gz" >> "$GITHUB_ENV"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: ${{ env.PACKAGED }}
+          if-no-files-found: error
+
+  release:
+    name: Publish release
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Collect files and generate checksums
+        shell: bash
+        run: |
+          mkdir -p release
+          find artifacts -type f \( -name '*.zip' -o -name '*.tar.gz' \) -exec cp {} release/ \;
+          ( cd release && sha256sum ./*.zip ./*.tar.gz > SHA256SUMS.txt )
+          ls -la release
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Cookie Launcher ${{ github.ref_name }}
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          files: |
+            release/*.zip
+            release/*.tar.gz
+            release/SHA256SUMS.txt
