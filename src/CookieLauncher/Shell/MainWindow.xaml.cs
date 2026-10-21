@@ -29,14 +29,15 @@ public partial class MainWindow : Window
         Navigate("home");
 
         ThemeService.ThemeChanged += OnThemeChanged;
-        {
-        }
+        // The haze is tinted from the generated scheme, so it must be applied once at
+        // startup rather than only when a theme switch event fires.
+        OnThemeChanged(ThemeCatalogue.Get(ThemeService.CurrentId));
 
-        StatusRight.Text = $"Java {Environment.Version}   windows/{Environment.Is64BitProcess switch { true => "x64", false => "x86" }}";
+        string runtime = Environment.Is64BitProcess ? "x64" : "x86";
+        StatusRight.Text = $".NET {Environment.Version.ToString(2)}   windows/{runtime}";
+        VersionLabel.Text = $"v{AppInfo.Version}";
         Log.Info("Shell ready");
     }
-
-    /// <summary>Raised when the app wants the status strip updated.</summary>
 
     private void BuildPages()
     {

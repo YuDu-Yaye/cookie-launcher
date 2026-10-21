@@ -68,11 +68,11 @@ public sealed record MaterialScheme
 public static class SchemeTonalSpot
 {
     // Chromas from the reference tonal-spot implementation.
-    private const double PrimaryChroma = 36.0;
-    private const double SecondaryChroma = 16.0;
-    private const double TertiaryChroma = 24.0;
-    private const double NeutralChroma = 6.0;
-    private const double NeutralVariantChroma = 8.0;
+    private const double PrimaryChroma = 48.0;
+    private const double SecondaryChroma = 20.0;
+    private const double TertiaryChroma = 30.0;
+    private const double NeutralChroma = 8.0;
+    private const double NeutralVariantChroma = 10.0;
     private const double ErrorChroma = 84.0;
 
     /// <summary>Builds the light or dark scheme for a seed colour.</summary>

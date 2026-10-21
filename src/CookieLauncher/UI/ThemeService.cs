@@ -9,14 +9,13 @@ namespace CookieLauncher.UI;
 /// </summary>
 /// <remarks>
 /// <para>
-/// Styles and templates in <c>App.xaml</c> reference colours through
-/// <c>DynamicResource</c>, so replacing these brushes repaints the whole shell without
-/// reloading any style. That is the same mechanism SkyLite's theme manager uses, and it
-/// is why switching schemes is instant rather than a window rebuild.
+/// Styles and templates reference colours through <c>DynamicResource</c>, so replacing
+/// these brushes repaints the whole shell without reloading any style. Switching schemes
+/// is therefore instant rather than a window rebuild.
 /// </para>
 /// <para>
-/// Both a <c>Color</c> and a <c>Brush</c> are published per role: templates that animate
-/// a colour need the raw value, while everything else binds the brush.
+/// Both a <c>Color</c> and a <c>Brush</c> are published per role: templates that animate a
+/// colour need the raw value, while everything else binds the brush.
 /// </para>
 /// </remarks>
 public static class ThemeService
@@ -28,16 +27,25 @@ public static class ThemeService
 
     public static string CurrentId => _definition.Id;
 
+    public static string CurrentName => _definition.Name;
+
     public static bool IsDark => _definition.Dark;
 
-    public static MaterialScheme Scheme =>
-        _scheme ??= ThemeCatalogue.Generate(_definition.Id);
+    public static MaterialScheme Scheme => _scheme ??= ThemeCatalogue.Generate(_definition.Id);
 
-    /// <summary>Applies a scheme by catalogue id, rebuilding every themed resource.</summary>
-    public static void Apply(string? id)
+    /// <summary>
+    /// Applies a scheme by catalogue id.
+    /// </summary>
+    /// <remarks>
+    /// An unknown id resolves to the default catalogue entry rather than throwing, and the
+    /// caller is told which id was actually applied so a stale value in <c>config.json</c>
+    /// can be corrected instead of silently ignored every launch.
+    /// </remarks>
+    public static string Apply(string? id)
     {
-        _definition = ThemeCatalogue.Get(id);
-        _scheme = ThemeCatalogue.Generate(_definition.Id);
+        SchemeDefinition requested = ThemeCatalogue.Get(id);
+        _definition = requested;
+        _scheme = ThemeCatalogue.Generate(requested.Id);
 
         ResourceDictionary resources = Application.Current.Resources;
         MaterialScheme scheme = _scheme;
@@ -80,43 +88,49 @@ public static class ThemeService
 
         ApplyGlassTokens(resources, scheme);
 
-        ThemeChanged?.Invoke(_definition);
+        ThemeChanged?.Invoke(requested);
+        return requested.Id;
     }
 
     /// <summary>
     /// Publishes the translucent surface brushes the glass shell paints with.
     /// </summary>
     /// <remarks>
-    /// These are deliberately <em>not</em> the opaque M3 container roles: a launcher
-    /// window sits on top of a desktop, and some transparency is what makes the ambient
-    /// haze readable through the panels. The alpha values are tuned so a card still
-    /// passes text contrast against the brightest part of the haze.
+    /// These are deliberately not the opaque M3 container roles: some transparency is what
+    /// makes the ambient haze readable through the panels. Alpha values are tuned so card
+    /// text still passes contrast against the brightest part of the haze.
     /// </remarks>
     private static void ApplyGlassTokens(ResourceDictionary resources, MaterialScheme scheme)
     {
         bool dark = _definition.Dark;
 
+        // Near-black tint in the dark scheme, near-white in the light one.
+        Color tintStart = dark
+            ? Color.FromArgb(0x8E, 0x0A, 0x0B, 0x10)
+            : Color.FromArgb(0xA2, 0xFA, 0xFA, 0xFD);
+        Color tintEnd = dark
+            ? Color.FromArgb(0x8E, 0x05, 0x06, 0x0A)
+            : Color.FromArgb(0xA2, 0xF2, 0xF2, 0xF7);
+
         resources["GlassTintBrush"] = new LinearGradientBrush(
-            Color.FromArgb(dark ? (byte)0x8A : (byte)0x9A, 0x0E, 0x0C, 0x11),
-            Color.FromArgb(dark ? (byte)0x8A : (byte)0x9A, 0x07, 0x06, 0x0A),
-            new Point(0, 0), new Point(0.35, 1));
+            tintStart, tintEnd, new Point(0, 0), new Point(0.35, 1));
 
         resources["GlassStrokeBrush"] = new LinearGradientBrush(
-            WithAlpha(ColorOf(scheme.OnSurfaceVariant), 0x33),
-            WithAlpha(ColorOf(scheme.OnSurfaceVariant), 0x33),
+            WithAlpha(ColorOf(scheme.OnSurfaceVariant), 0x38),
+            WithAlpha(ColorOf(scheme.OnSurfaceVariant), 0x18),
             new Point(0, 0), new Point(1, 1));
 
         resources["SurfaceContainerLowBrush"] =
-            new SolidColorBrush(WithAlpha(ColorOf(scheme.SurfaceContainerLow), 0x9E));
+            new SolidColorBrush(WithAlpha(ColorOf(scheme.SurfaceContainerLow), dark ? (byte)0xA8 : (byte)0xB8));
         resources["SurfaceContainerBrush"] =
-            new SolidColorBrush(WithAlpha(ColorOf(scheme.SurfaceContainer), 0xB4));
+            new SolidColorBrush(WithAlpha(ColorOf(scheme.SurfaceContainer), dark ? (byte)0xBE : (byte)0xCC));
         resources["SurfaceContainerHighBrush"] =
-            new SolidColorBrush(WithAlpha(ColorOf(scheme.SurfaceContainerHigh), 0xC8));
+            new SolidColorBrush(WithAlpha(ColorOf(scheme.SurfaceContainerHigh), dark ? (byte)0xD0 : (byte)0xDC));
         resources["SurfaceContainerHighestBrush"] =
-            new SolidColorBrush(WithAlpha(ColorOf(scheme.SurfaceContainerHighest), 0xD8));
+            new SolidColorBrush(WithAlpha(ColorOf(scheme.SurfaceContainerHighest), dark ? (byte)0xDE : (byte)0xE8));
 
         resources["DividerBrush"] =
-            new SolidColorBrush(WithAlpha(ColorOf(scheme.OnSurfaceVariant), 0x1F));
+            new SolidColorBrush(WithAlpha(ColorOf(scheme.OnSurfaceVariant), 0x22));
         resources["StateHoverBrush"] =
             new SolidColorBrush(WithAlpha(ColorOf(scheme.OnSurface), 0x14));
         resources["StatePressedBrush"] =
@@ -124,9 +138,9 @@ public static class ThemeService
         resources["RippleBrush"] =
             new SolidColorBrush(WithAlpha(ColorOf(scheme.OnSurface), 0x29));
         resources["InputFillBrush"] =
-            new SolidColorBrush(WithAlpha(ColorOf(scheme.OnSurface), 0x14));
+            new SolidColorBrush(WithAlpha(ColorOf(scheme.OnSurface), 0x12));
         resources["InputHoverBrush"] =
-            new SolidColorBrush(WithAlpha(ColorOf(scheme.OnSurface), 0x1F));
+            new SolidColorBrush(WithAlpha(ColorOf(scheme.OnSurface), 0x1C));
 
         resources["ScrollThumbBrush"] =
             new SolidColorBrush(WithAlpha(ColorOf(scheme.OnSurfaceVariant), 0x66));
