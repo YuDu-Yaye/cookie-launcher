@@ -68,6 +68,7 @@ public final class Cli {
 
     public static void run(String[] args, String command) {
         int exit = 0;
+        setCommand(command);
         try {
             String home = valueOf(args, "--home");
             if (home != null && !home.isBlank()) {
@@ -217,7 +218,7 @@ public final class Cli {
         }
         System.out.println(runtimes.size() + " runtime(s):");
         for (JavaRuntime runtime : runtimes) {
-            System.out.println("  " + runtime.label());
+            System.out.println("  " + runtime.plainLabel());
             System.out.println("    " + runtime.executable());
         }
     }
@@ -238,7 +239,7 @@ public final class Cli {
     }
 
     private static void doctor() {
-        System.out.println(AppInfo.NAME + " " + AppInfo.VERSION + " doctor");
+        System.out.println(AppInfo.NAME + " " + AppInfo.VERSION + " environment report");
         System.out.println("  OS           : " + Os.displayName() + " (" + Os.mojangArch() + ")");
         System.out.println("  JVM          : " + System.getProperty("java.version")
                 + " (" + System.getProperty("java.vendor") + ")");
@@ -256,7 +257,7 @@ public final class Cli {
         List<JavaRuntime> runtimes = new JavaLocator().all();
         System.out.println("  Java runtimes: " + runtimes.size());
         for (JavaRuntime runtime : runtimes) {
-            System.out.println("    - " + runtime.label() + "  " + runtime.executable());
+            System.out.println("    - " + runtime.plainLabel() + "  " + runtime.executable());
         }
         List<String> installed = GameInstaller.installedVersions();
         System.out.println("  Versions     : " + (installed.isEmpty()
@@ -294,14 +295,37 @@ public final class Cli {
         });
     }
 
+    private static String command;
+
+    /** Records the active command so positional parsing can skip it. */
+    static void setCommand(String value) {
+        command = value;
+    }
+
+    /**
+     * Returns the nth positional argument, ignoring options, their values and the
+     * command token itself. This lets {@code --home /tmp install 1.20.1} and
+     * {@code install 1.20.1 --home /tmp} behave identically.
+     */
     private static String positional(String[] args, int index) {
         int seen = 0;
+        boolean skippedCommand = false;
         for (int i = 0; i < args.length; i++) {
             String arg = args[i];
+            if (arg == null || arg.isBlank()) {
+                continue;
+            }
             if (arg.startsWith("--")) {
                 if (takesValue(arg)) {
                     i++;
                 }
+                continue;
+            }
+            if (arg.startsWith("-")) {
+                continue;
+            }
+            if (!skippedCommand && command != null && arg.equalsIgnoreCase(command)) {
+                skippedCommand = true;
                 continue;
             }
             if (seen == index) {

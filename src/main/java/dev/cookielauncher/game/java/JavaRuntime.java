@@ -13,9 +13,18 @@ public record JavaRuntime(Path executable, int major, String version, String ven
         return !"x86".equalsIgnoreCase(arch) && !"arm32".equalsIgnoreCase(arch);
     }
 
-    /** e.g. "Java 21 · Eclipse Temurin · x64". */
+    /** Rich label for the GUI, e.g. "Java 21 · Eclipse Temurin · x64". */
     public String label() {
-        return "Java " + major + "  ·  " + vendor + "  ·  " + arch;
+        return "Java " + major + "  \u00b7  " + vendor + "  \u00b7  " + arch;
+    }
+
+    /**
+     * ASCII-only label for terminals. Windows consoles still default to a legacy
+     * code page where the middle dot renders as mojibake, so the CLI never uses
+     * {@link #label()}.
+     */
+    public String plainLabel() {
+        return "Java " + major + " (" + vendor + ", " + arch + ")";
     }
 
     /** e.g. "21.0.2". */

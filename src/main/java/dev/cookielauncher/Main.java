@@ -10,37 +10,74 @@ import dev.cookielauncher.ui.LauncherWindow;
 import javax.swing.SwingUtilities;
 import javax.swing.UIManager;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Locale;
 
-/** Entry point: GUI by default, command line when arguments are given. */
+/**
+ * Entry point: GUI by default, command line when a command is present.
+ *
+ * <p>Global options may appear before or after the command, so
+ * {@code --home /tmp/x doctor} and {@code doctor --home /tmp/x} both work. The
+ * first non-option token is the command; everything after it belongs to the
+ * command, and anything starting with {@code --} is a global option.</p>
+ */
 public final class Main {
+
+    private static final List<String> COMMANDS = List.of(
+            "list", "install", "launch", "repair", "java", "doctor",
+            "accounts", "analyze", "version", "help");
+
+    /** Options that consume the following token as their value. */
+    private static final List<String> VALUE_OPTIONS = List.of(
+            "--home", "--source", "--proxy", "--loader", "--loader-version");
 
     private Main() {
     }
 
     public static void main(String[] args) {
-        Log.setFile(AppPaths.launcherLog());
-        String mode = args.length == 0 ? "gui" : args[0].toLowerCase(Locale.ROOT);
-        if (mode.startsWith("-")) {
-            if (mode.equals("--help") || mode.equals("-h")) {
+        if (args.length == 0) {
+            startGui();
+            return;
+        }
+        String command = firstCommand(args);
+        if (command == null) {
+            if (hasFlag(args, "--help") || hasFlag(args, "-h")) {
                 Cli.printHelp();
                 return;
             }
-            Cli.run(Arrays.copyOfRange(args, 1, args.length), mode.startsWith("--")
-                    ? mode.substring(2) : mode.substring(1));
+            startGui();
             return;
         }
-        switch (mode) {
-            case "gui" -> startGui();
-            case "help" -> Cli.printHelp();
-            case "version", "list", "install", "launch", "repair", "java", "doctor",
-                 "accounts", "analyze" -> Cli.run(Arrays.copyOfRange(args, 1, args.length), mode);
-            default -> {
-                System.err.println("Unknown command: " + mode);
-                Cli.printHelp();
-                System.exit(2);
-            }
+        if ("help".equals(command)) {
+            Cli.printHelp();
+            return;
         }
+        Log.setFile(AppPaths.launcherLog());
+        Log.setDebug(hasFlag(args, "--debug"));
+        Cli.run(args, command);
+    }
+
+    /** Returns the first non-option token, or null when there is none. */
+    static String firstCommand(String[] args) {
+        for (int i = 0; i < args.length; i++) {
+            String argument = args[i];
+            if (argument == null || argument.isBlank()) {
+                continue;
+            }
+            if (argument.startsWith("-")) {
+                if (VALUE_OPTIONS.contains(argument)) {
+                    i++;
+                }
+                continue;
+            }
+            String candidate = argument.toLowerCase(Locale.ROOT);
+            return COMMANDS.contains(candidate) || candidate.matches("[a-z]+") ? candidate : null;
+        }
+        return null;
+    }
+
+    static boolean hasFlag(String[] args, String flag) {
+        return Arrays.asList(args).contains(flag);
     }
 
     private static void startGui() {
