@@ -1,0 +1,49 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Cookie Launcher shell.
+
+    WPF is chosen over a cross-platform toolkit because this build targets Windows
+    only: the owner decided a native Material 3 shell matters more than the extra
+    platforms, and WPF gives retained-mode composition, real hardware acceleration
+    and CSS-like styling that a self-painted canvas cannot match.
+  -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+
+    <AssemblyName>CookieLauncher</AssemblyName>
+    <RootNamespace>CookieLauncher</RootNamespace>
+    <Version>1.0.0</Version>
+    <Product>Cookie Launcher</Product>
+    <AssemblyTitle>Cookie Launcher</AssemblyTitle>
+    <Description>Open source Minecraft: Java Edition launcher.</Description>
+    <Company>Cookie Launcher contributors</Company>
+
+    <!-- Per-monitor DPI so the shell is crisp on scaled displays. -->
+    <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
+
+    <!--
+      Trimming is off: WPF does not support it, and the downloader uses reflection
+      through System.Text.Json source generation only.
+    -->
+    <PublishTrimmed>false</PublishTrimmed>
+    <PublishSingleFile>false</PublishSingleFile>
+
+    <!--
+      Treat warnings as errors so nullable and analyser noise cannot accumulate.
+    -->
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <AnalysisLevel>latest</AnalysisLevel>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+    <Optimize>true</Optimize>
+    <DebugType>none</DebugType>
+  </PropertyGroup>
+
+</Project>

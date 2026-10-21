@@ -1,4 +1,10 @@
-# Build output
+# .NET build output
+bin/
+obj/
+src/CookieLauncher/bin/
+src/CookieLauncher/obj/
+
+# Java build output (legacy engine being ported)
 build/
 out/
 dist/
@@ -7,6 +13,8 @@ dist/
 # IDE
 .idea/
 *.iml
+.vs/
+*.user
 .vscode/
 .settings/
 .project
@@ -16,7 +24,7 @@ dist/
 Thumbs.db
 .DS_Store
 
-# Launcher data (portable mode marker is committed, data is not)
+# Launcher data (portable marker is committed, data is not)
 data/
 *.log
 
