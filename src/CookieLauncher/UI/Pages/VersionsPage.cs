@@ -2,7 +2,9 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Markup;
 using System.Windows.Media;
+using CookieLauncher.Core;
 using CookieLauncher.Game.Contracts;
+using CookieLauncher.Game.Download;
 using CookieLauncher.Game.Install;
 using CookieLauncher.Game.Meta;
 
@@ -84,7 +86,11 @@ public sealed class VersionsPage : PageBase
     private readonly ComboBox _loaderFilter;
     private readonly TextBlock _statusLine;
     private readonly Button _installButton;
+    private readonly ProgressBar _progressBar;
+    private readonly TextBlock _progressText;
+    private readonly Grid _progressPanel;
     private IReadOnlyList<VersionEntry> _all = [];
+    private CancellationTokenSource? _installCancellation;
 
     public VersionsPage()
     {
@@ -94,6 +100,7 @@ public sealed class VersionsPage : PageBase
         root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
 
         // ---- Headline ------------------------------------------------------
@@ -168,6 +175,40 @@ public sealed class VersionsPage : PageBase
         Grid.SetRow(_list, 2);
         root.Children.Add(_list);
 
+        // ---- Progress ------------------------------------------------------
+        // M3 linear indicator plus a byte counter. Hidden until an install runs,
+        // so the page does not reserve empty space for a state it is rarely in.
+        var progressPanel = new Grid { Margin = new Thickness(0, 10, 0, 0), Visibility = Visibility.Collapsed };
+        progressPanel.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        progressPanel.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+        _progressBar = new ProgressBar
+        {
+            Height = 4,
+            Minimum = 0,
+            Maximum = 1,
+            Value = 0,
+            Foreground = (Brush)FindResource("PrimaryBrush"),
+            Background = (Brush)FindResource("SurfaceContainerHighestBrush"),
+            BorderThickness = new Thickness(0),
+            VerticalAlignment = VerticalAlignment.Center,
+        };
+        Grid.SetColumn(_progressBar, 0);
+        progressPanel.Children.Add(_progressBar);
+
+        _progressText = new TextBlock
+        {
+            Style = (Style)FindResource("MdLabelSmall"),
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(12, 0, 0, 0),
+        };
+        Grid.SetColumn(_progressText, 1);
+        progressPanel.Children.Add(_progressText);
+
+        Grid.SetRow(progressPanel, 3);
+        root.Children.Add(progressPanel);
+        _progressPanel = progressPanel;
+
         // ---- Footer --------------------------------------------------------
         var footer = new Grid { Margin = new Thickness(0, 10, 0, 0) };
         footer.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
@@ -193,7 +234,7 @@ public sealed class VersionsPage : PageBase
         Grid.SetColumn(_installButton, 1);
         footer.Children.Add(_installButton);
 
-        Grid.SetRow(footer, 3);
+        Grid.SetRow(footer, 4);
         root.Children.Add(footer);
 
         Content = root;
@@ -291,13 +332,122 @@ public sealed class VersionsPage : PageBase
         _installButton.Content = GameInstaller.IsInstalled(entry.Id) ? "Repair" : "Install";
     }
 
-    private void InstallSelected()
+    private async void InstallSelected()
     {
-        if (_list.SelectedItem is not VersionEntry entry)
+        if (_list.SelectedItem is not VersionEntry entry || _installCancellation is not null)
         {
             return;
         }
-        string loader = _loaderFilter.SelectedItem as string ?? "Vanilla";
-        SetStatus($"Selected {entry.Id} ({loader}). Installer wiring lands in the next step.");
+
+        if (GameInstaller.IsInstalled(entry.Id))
+        {
+            SetStatus($"Verifying {entry.Id}...");
+        }
+        else
+        {
+            SetStatus($"Installing {entry.Id}...");
+        }
+
+        _installCancellation = new CancellationTokenSource();
+        _installButton.IsEnabled = false;
+        _progressPanel.Visibility = Visibility.Visible;
+        _progressBar.Value = 0;
+        _progressText.Text = "Preparing...";
+
+        DownloadProgress progress = new();
+        // The downloader reports progress from worker threads; marshal to the UI thread
+        // before touching any control.
+        using System.Threading.Timer pump = new(_ =>
+        {
+            Dispatcher.Invoke(() =>
+            {
+                _progressBar.Value = progress.Fraction;
+                _progressText.Text = Describe(progress);
+            });
+        }, null, 0, 150);
+
+        try
+        {
+            GameInstaller installer = new(App.Settings.Mirror, App.Settings.DownloadWorkers);
+            await installer.InstallAsync(entry.Id, progress, _installCancellation.Token)
+                .ConfigureAwait(true);
+
+            _progressBar.Value = 1;
+            _progressText.Text = "Installed";
+            SetStatus($"Installed {entry.Id}");
+            RefreshInstalledFlags();
+        }
+        catch (OperationCanceledException)
+        {
+            SetStatus("Install cancelled");
+        }
+        catch (Exception error)
+        {
+            Log.Error("Install failed", error);
+            _progressText.Text = "Failed";
+            SetStatus("Install failed: " + error.Message);
+        }
+        finally
+        {
+            _installCancellation?.Dispose();
+            _installCancellation = null;
+            _installButton.IsEnabled = true;
+            UpdateSelection();
+        }
+    }
+
+    /// <summary>Human summary of a download: bytes, percentage, speed and remaining time.</summary>
+    private static string Describe(DownloadProgress progress)
+    {
+        if (progress.TotalBytes <= 0)
+        {
+            return progress.Status;
+        }
+        string bytes = FormatBytes(progress.CompletedBytes) + " / " + FormatBytes(progress.TotalBytes);
+        string percent = (progress.Fraction * 100).ToString("0") + "%";
+        double speed = progress.BytesPerSecond;
+        if (speed <= 0)
+        {
+            return $"{bytes}  ·  {percent}";
+        }
+        string rate = FormatBytes((long)speed) + "/s";
+        TimeSpan eta = progress.Eta;
+        string remaining = eta.TotalSeconds >= 1 ? "  ·  " + FormatDuration(eta) + " left" : "";
+        return $"{bytes}  ·  {percent}  ·  {rate}{remaining}";
+    }
+
+    private static string FormatBytes(long value)
+    {
+        if (value < 1024)
+        {
+            return value + " B";
+        }
+        string[] units = ["KB", "MB", "GB"];
+        double scaled = value;
+        int unit = -1;
+        do
+        {
+            scaled /= 1024;
+            unit++;
+        }
+        while (scaled >= 1024 && unit < units.Length - 1);
+        return scaled.ToString(scaled >= 100 ? "0" : "0.0") + " " + units[unit];
+    }
+
+    private static string FormatDuration(TimeSpan span) =>
+        span.TotalMinutes >= 1
+            ? $"{(int)span.TotalMinutes}m {span.Seconds}s"
+            : $"{Math.Max(1, span.Seconds)}s";
+
+    /// <summary>Re-checking the disk is cheap; the button label depends on it.</summary>
+    private void RefreshInstalledFlags()
+    {
+        HashSet<string> installed = [.. GameInstaller.InstalledVersions()];
+        List<VersionEntry> refreshed = [.. _all.Select(entry => entry with
+        {
+            Installed = installed.Contains(entry.Id),
+        })];
+        _all = refreshed;
+        ApplyFilter();
     }
 }
