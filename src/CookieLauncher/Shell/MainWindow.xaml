@@ -133,6 +133,19 @@
                             </StackPanel>
                         </RadioButton>
 
+                        <RadioButton x:Name="NavInstances"
+                                     Style="{StaticResource MdNavRailItem}"
+                                     Tag="instances"
+                                     ToolTip="Instances"
+                                     Checked="OnNavChecked">
+                            <StackPanel>
+                                <Path Data="{StaticResource InstancesGlyph}" Width="22" Height="22"
+                                      Stretch="Uniform" HorizontalAlignment="Center"
+                                      Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" />
+                                <TextBlock Text="Instances" Margin="0,4,0,0" HorizontalAlignment="Center" />
+                            </StackPanel>
+                        </RadioButton>
+
                         <RadioButton x:Name="NavVersions"
                                      Style="{StaticResource MdNavRailItem}"
                                      Tag="versions"

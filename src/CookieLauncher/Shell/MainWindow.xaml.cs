@@ -42,6 +42,7 @@ public partial class MainWindow : Window
     private void BuildPages()
     {
         _pages["home"] = new PlayPage();
+        _pages["instances"] = new InstancesPage();
         _pages["versions"] = new VersionsPage();
         _pages["mods"] = new ModsPage();
         _pages["accounts"] = new AccountsPage();
@@ -65,6 +66,7 @@ public partial class MainWindow : Window
 
         RadioButton? item = id switch
         {
+            "instances" => NavInstances,
             "versions" => NavVersions,
             "mods" => NavMods,
             "accounts" => NavAccounts,
@@ -80,6 +82,7 @@ public partial class MainWindow : Window
 
     private static string TitleFor(string id) => id switch
     {
+        "instances" => "Instances",
         "versions" => "Versions",
         "mods" => "Mods",
         "accounts" => "Accounts",

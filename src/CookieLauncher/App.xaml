@@ -219,6 +219,11 @@
                                 <Border x:Name="Surface"
                                         CornerRadius="20"
                                         Background="{DynamicResource PrimaryBrush}" />
+                                <!-- A 1dp top highlight makes a flat fill read as a surface. -->
+                                <Border x:Name="TopLight"
+                                        CornerRadius="20"
+                                        BorderBrush="#33FFFFFF"
+                                        BorderThickness="1,1,1,0" />
                                 <Border x:Name="StateLayer"
                                         CornerRadius="20"
                                         Background="{DynamicResource OnPrimaryBrush}"
@@ -280,6 +285,10 @@
                                 <Border x:Name="Surface"
                                         CornerRadius="20"
                                         Background="{DynamicResource SecondaryContainerBrush}" />
+                                <Border x:Name="TopLight"
+                                        CornerRadius="20"
+                                        BorderBrush="#1FFFFFFF"
+                                        BorderThickness="1,1,1,0" />
                                 <Border x:Name="StateLayer"
                                         CornerRadius="20"
                                         Background="{DynamicResource OnSecondaryContainerBrush}"
@@ -419,6 +428,10 @@
                                 <Border x:Name="Surface"
                                         CornerRadius="20"
                                         Background="{DynamicResource ErrorContainerBrush}" />
+                                <Border x:Name="TopLight"
+                                        CornerRadius="20"
+                                        BorderBrush="#22FFFFFF"
+                                        BorderThickness="1,1,1,0" />
                                 <Border x:Name="StateLayer"
                                         CornerRadius="20"
                                         Background="{DynamicResource OnErrorContainerBrush}"
@@ -564,6 +577,8 @@
             <Style x:Key="MdCardFilled" TargetType="Border">
                 <Setter Property="CornerRadius" Value="12" />
                 <Setter Property="Background" Value="{DynamicResource SurfaceContainerHighBrush}" />
+                <Setter Property="BorderBrush" Value="{DynamicResource DividerBrush}" />
+                <Setter Property="BorderThickness" Value="1" />
                 <Setter Property="Padding" Value="16" />
             </Style>
 
@@ -930,6 +945,9 @@
              LAUNCHER GLYPHS — Material Symbols paths, 24x24 viewbox.
             ============================================================
             -->
+            <PathGeometry x:Key="InstancesGlyph"
+                          Figures="M4 4h7v7H4zm9 0h7v7h-7zM4 13h7v7H4zm9 0h7v7h-7z" />
+
             <PathGeometry x:Key="PlayGlyph" Figures="M8 5v14l11-7z" />
             <PathGeometry x:Key="VersionsGlyph" Figures="M4 6h16v2H4zm0 5h16v2H4zm0 5h16v2H4z" />
             <PathGeometry x:Key="ModsGlyph"
