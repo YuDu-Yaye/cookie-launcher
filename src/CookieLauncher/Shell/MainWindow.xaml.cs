@@ -10,12 +10,17 @@ using CookieLauncher.UI.Pages;
 namespace CookieLauncher.Shell;
 
 /// <summary>
-/// The application shell: app bar, navigation rail, page host and status strip.
+/// The launcher shell, arranged like PCL2 and rendered in Material 3.
 /// </summary>
 /// <remarks>
-/// The window is undecorated, so the app bar is also the title bar. Resize is handled by
-/// <c>WindowChrome.ResizeBorderThickness</c> rather than custom hit-testing, which keeps
-/// the platform's own edge behaviour (including snap and double-click maximise) intact.
+/// <para>
+/// Left column: login switch, avatar, account name, and the large launch block pinned to
+/// the bottom with the two version buttons under it. Top: a compact strip whose centre is a
+/// pill navigation group. Right: the page area.
+/// </para>
+/// <para>
+/// The window is undecorated, so the top strip doubles as the title bar.
+/// </para>
 /// </remarks>
 public partial class MainWindow : Window
 {
@@ -26,18 +31,23 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         BuildPages();
-        Navigate("home");
 
         ThemeService.ThemeChanged += OnThemeChanged;
-        // The haze is tinted from the generated scheme, so it must be applied once at
-        // startup rather than only when a theme switch event fires.
         OnThemeChanged(ThemeCatalogue.Get(ThemeService.CurrentId));
 
-        string runtime = Environment.Is64BitProcess ? "x64" : "x86";
-        StatusRight.Text = $".NET {Environment.Version.ToString(2)}   windows/{runtime}";
-        VersionLabel.Text = $"v{AppInfo.Version}";
+        string arch = Environment.Is64BitProcess ? "x64" : "x86";
+        StatusRight.Text = $".NET {Environment.Version.ToString(2)}   windows/{arch}";
+
+        RefreshAccount();
+        RefreshLaunchBlock();
+        Navigate("home");
+        LaunchSurface.MouseLeftButtonUp += (_, _) => LaunchGame();
+
         Log.Info("Shell ready");
     }
+
+    /// <summary>The live window.</summary>
+    public static MainWindow? Instance { get; private set; }
 
     private void BuildPages()
     {
@@ -48,10 +58,10 @@ public partial class MainWindow : Window
         _pages["accounts"] = new AccountsPage();
         _pages["log"] = new LogPage();
         _pages["settings"] = new SettingsPage();
-
+        _pages["more"] = new MorePage();
     }
 
-    /// <summary>Switches to a page and updates the app bar title and rail selection.</summary>
+    /// <summary>Switches page and syncs the pill selection.</summary>
     public void Navigate(string id)
     {
         if (!_pages.TryGetValue(id, out PageBase? page))
@@ -62,59 +72,165 @@ public partial class MainWindow : Window
         _currentPage = id;
         PageHost.Content = page;
         page.OnShown();
-        DestinationTitle.Text = TitleFor(id);
 
-        RadioButton? item = id switch
+        RadioButton? tab = id switch
         {
             "instances" => NavInstances,
             "versions" => NavVersions,
-            "mods" => NavMods,
-            "accounts" => NavAccounts,
-            "log" => NavLogs,
             "settings" => NavSettings,
+            "more" => NavMore,
             _ => NavPlay,
         };
-        if (item is not null && item.IsChecked != true)
+        if (tab is not null && tab.IsChecked != true)
         {
-            item.IsChecked = true;
+            tab.IsChecked = true;
         }
-    }
 
-    private static string TitleFor(string id) => id switch
-    {
-        "instances" => "Instances",
-        "versions" => "Versions",
-        "mods" => "Mods",
-        "accounts" => "Accounts",
-        "log" => "Logs",
-        "settings" => "Settings",
-        _ => "Play",
-    };
+        RefreshLaunchBlock();
+    }
 
     private void OnNavChecked(object sender, RoutedEventArgs e)
     {
-        if (sender is RadioButton { Tag: string id } button && button.IsChecked == true)
+        if (sender is not RadioButton { Tag: string id } button || button.IsChecked != true)
         {
-            Navigate(id);
+            return;
+        }
+        // The first Checked fires while XAML is still loading the tree.
+        if (PageHost is null)
+        {
+            return;
+        }
+        Navigate(id);
+    }
+
+    // ------------------------------------------------------------------
+    // Left column
+    // ------------------------------------------------------------------
+
+    /// <summary>Repaints the account card from the store.</summary>
+    public void RefreshAccount()
+    {
+        Account? account = LauncherState.Current.SelectedAccount;
+        if (account is null)
+        {
+            AvatarInitials.Text = "?";
+            AccountName.Text = "No account";
+            AccountKind.Text = "Add one to play";
+            SwitchAccountButton.Content = "Add account";
+            return;
+        }
+
+        AvatarInitials.Text = Initials(account.Username);
+        AccountName.Text = account.Username;
+        AccountKind.Text = account.Type switch
+        {
+            "authlib" => "Authlib account",
+            "microsoft" => "Microsoft account",
+            _ => "Offline profile",
+        };
+        SwitchAccountButton.Content = "Switch account";
+        LoginOffline.IsChecked = account.Type == "offline";
+        LoginOnline.IsChecked = account.Type != "offline";
+    }
+
+    private static string Initials(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            return "?";
+        }
+        string trimmed = name.Trim();
+        return trimmed.Length == 1
+            ? trimmed.ToUpperInvariant()
+            : (trimmed[0].ToString() + trimmed[^1]).ToUpperInvariant();
+    }
+
+    /// <summary>Repaints the bottom launch block from the selected instance.</summary>
+    public void RefreshLaunchBlock()
+    {
+        Instance? instance = LauncherState.Current.Instance;
+        if (instance is null)
+        {
+            LaunchVersion.Text = "No instance selected";
+            LaunchLabel.Text = "Launch game";
+            return;
+        }
+
+        bool installed = Game.Install.GameInstaller.IsInstalled(instance.Version);
+        LaunchVersion.Text = string.IsNullOrWhiteSpace(instance.Version)
+            ? "Pick a version first"
+            : instance.Subtitle() + (installed ? "" : "  ·  not installed");
+        LaunchLabel.Text = installed ? "Launch game" : "Install first";
+    }
+
+    private void OnLoginTypeChanged(object sender, RoutedEventArgs e)
+    {
+        // XAML raises Checked during InitializeComponent, before the named elements are
+        // assigned; guard so the window can finish loading.
+        if (StatusText is null || LoginOnline is null)
+        {
+            return;
+        }
+
+        if (LoginOnline.IsChecked == true)
+        {
+            Account? account = LauncherState.Current.SelectedAccount;
+            if (account is null || !account.IsOnline)
+            {
+                SetStatus("Add a Microsoft or authlib account to play online.");
+            }
         }
     }
 
+    private void OnSwitchAccount(object sender, RoutedEventArgs e)
+    {
+        Navigate("accounts");
+        SetStatus("Choose or add an account.");
+    }
+
+    private void OnVersionSelect(object sender, RoutedEventArgs e)
+    {
+        Navigate("versions");
+        SetStatus("Pick a version to install.");
+    }
+
+    private void OnVersionSettings(object sender, RoutedEventArgs e)
+    {
+        Navigate("instances");
+        SetStatus("Select an instance to configure it.");
+    }
+
+    private void LaunchGame()
+    {
+        Instance? instance = LauncherState.Current.Instance;
+        if (instance is null)
+        {
+            Navigate("versions");
+            SetStatus("Create an instance and install a version first.");
+            return;
+        }
+        if (!Game.Install.GameInstaller.IsInstalled(instance.Version))
+        {
+            Navigate("versions");
+            SetStatus("That version is not installed yet.");
+            return;
+        }
+        SetStatus("Launch pipeline wiring is the next step.");
+    }
+
+    // ------------------------------------------------------------------
+    // Theme and shell plumbing
+    // ------------------------------------------------------------------
+
     private void OnThemeChanged(SchemeDefinition definition)
     {
-        // The haze is tinted from the generated scheme, not from a hardcoded palette.
         MaterialScheme scheme = ThemeService.Scheme;
         Ambient.SetColors(
             ToColor(scheme.Primary),
             ToColor(scheme.Tertiary),
             ToColor(scheme.Secondary));
         Ambient.SetIntensity(definition.Dark ? 1.0 : 0.72);
-        ResetBackground();
-    }
 
-    private void ResetBackground()
-    {
-        // The window background must stay transparent so the DWM glass shows through;
-        // only the tint brush changes.
         Background = Brushes.Transparent;
         RootBorder.Background = (Brush)FindResource("GlassTintBrush");
         RootBorder.BorderBrush = (Brush)FindResource("GlassStrokeBrush");
@@ -126,17 +242,11 @@ public partial class MainWindow : Window
         (byte)((argb >> 8) & 0xFF),
         (byte)(argb & 0xFF));
 
-    private void OnSourceInitialized(object? sender, EventArgs e)
-    {
-        // Ask DWM for the acrylic backdrop. Failure is tolerated: the tint over a solid
-        // surface still reads as glass.
+    private void OnSourceInitialized(object? sender, EventArgs e) =>
         WindowEffects.TryEnableBackdrop(this);
-    }
 
-    private void OnWindowStateChanged(object? sender, EventArgs e)
-    {
+    private void OnWindowStateChanged(object? sender, EventArgs e) =>
         MaximiseButton.Content = WindowState == WindowState.Maximized ? "\uE923" : "\uE922";
-    }
 
     private void OnTitleBarMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
@@ -156,23 +266,30 @@ public partial class MainWindow : Window
 
     private void OnMaximise(object sender, RoutedEventArgs e) => ToggleMaximise();
 
-    private void ToggleMaximise() =>
-        WindowState = WindowState == WindowState.Maximized
-            ? WindowState.Normal
-            : WindowState.Maximized;
+    private void ToggleMaximise() => WindowState =
+        WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
 
     private void OnClose(object sender, RoutedEventArgs e) => Close();
 
-    protected override void OnClosing(CancelEventArgs e)
+    /// <summary>Reports a message to the status strip from any page.</summary>
+    public static void ReportStatus(string message)
     {
-        Log.Info("Shell closing");
-        base.OnClosing(e);
+        MainWindow? window = Instance;
+        window?.Dispatcher.Invoke(() => window.SetStatus(message));
+    }
+
+    public void SetStatus(string message)
+    {
+        if (StatusText is not null)
+        {
+            StatusText.Text = message;
+        }
     }
 
     /// <summary>Shows a transient message near the bottom edge.</summary>
     public void ShowSnackbar(string message)
     {
-        var snackbar = new Border
+        SnackbarHost.Content = new Border
         {
             Background = (Brush)FindResource("InverseSurfaceBrush"),
             CornerRadius = new CornerRadius(8),
@@ -184,7 +301,6 @@ public partial class MainWindow : Window
                 FontSize = 13,
             },
         };
-        SnackbarHost.Content = snackbar;
 
         var timer = new System.Windows.Threading.DispatcherTimer
         {
@@ -198,19 +314,6 @@ public partial class MainWindow : Window
         timer.Start();
     }
 
-    /// <summary>Sets the left-hand status text.</summary>
-    public void SetStatus(string message) => StatusText.Text = message;
-
-    /// <summary>Reports a message to the shell status strip from any page.</summary>
-    public static void ReportStatus(string message)
-    {
-        MainWindow? window = Instance;
-        window?.Dispatcher.Invoke(() => window.SetStatus(message));
-    }
-
-    /// <summary>The single live window.</summary>
-    public static MainWindow? Instance { get; private set; }
-
     protected override void OnActivated(EventArgs e)
     {
         base.OnActivated(e);
@@ -221,8 +324,13 @@ public partial class MainWindow : Window
     protected override void OnDeactivated(EventArgs e)
     {
         base.OnDeactivated(e);
-        // Stop the drift while the window is in the background: it is invisible, and the
-        // animation would otherwise keep a render thread awake for nothing.
+        // The haze is invisible in the background; stop it rather than burn a render thread.
         Ambient.SetRunning(false);
+    }
+
+    protected override void OnClosing(CancelEventArgs e)
+    {
+        Log.Info("Shell closing");
+        base.OnClosing(e);
     }
 }

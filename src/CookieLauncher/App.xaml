@@ -1073,6 +1073,115 @@
                 </Setter>
             </Style>
 
+            <!--
+            ============================================================
+             PILL TAB
+             A 32dp destination button for the top capsule. Selected
+             state uses the secondary container role.
+            ============================================================
+            -->
+            <Style x:Key="MdPillTab" TargetType="RadioButton">
+                <Setter Property="Height" Value="32" />
+                <Setter Property="MinWidth" Value="76" />
+                <Setter Property="Padding" Value="16,0" />
+                <Setter Property="Margin" Value="2,0" />
+                <Setter Property="FontFamily" Value="{StaticResource MdTextFont}" />
+                <Setter Property="FontSize" Value="13" />
+                <Setter Property="Cursor" Value="Hand" />
+                <Setter Property="Foreground" Value="{DynamicResource OnSurfaceVariantBrush}" />
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="RadioButton">
+                            <Grid>
+                                <Border x:Name="Pill"
+                                        CornerRadius="16"
+                                        Background="Transparent"
+                                        Padding="{TemplateBinding Padding}" />
+                                <Border x:Name="StateLayer"
+                                        CornerRadius="16"
+                                        Background="{DynamicResource OnSurfaceBrush}"
+                                        Opacity="0" />
+                                <ContentPresenter HorizontalAlignment="Center"
+                                                  VerticalAlignment="Center"
+                                                  Margin="{TemplateBinding Padding}" />
+                            </Grid>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Trigger.EnterActions>
+                                        <BeginStoryboard Storyboard="{StaticResource MdStateHoverIn}" />
+                                    </Trigger.EnterActions>
+                                    <Trigger.ExitActions>
+                                        <BeginStoryboard Storyboard="{StaticResource MdStateHoverOut}" />
+                                    </Trigger.ExitActions>
+                                </Trigger>
+                                <Trigger Property="IsChecked" Value="True">
+                                    <Setter TargetName="Pill" Property="Background"
+                                            Value="{DynamicResource SecondaryContainerBrush}" />
+                                    <Setter Property="Foreground"
+                                            Value="{DynamicResource OnSecondaryContainerBrush}" />
+                                    <Setter Property="FontWeight" Value="SemiBold" />
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <!--
+            ============================================================
+             SEGMENTED TAB
+             A two-way switch, used for online versus offline login.
+            ============================================================
+            -->
+            <Style x:Key="MdSegmentedTab" TargetType="RadioButton">
+                <Setter Property="Height" Value="36" />
+                <Setter Property="MinWidth" Value="104" />
+                <Setter Property="Padding" Value="14,0" />
+                <Setter Property="FontFamily" Value="{StaticResource MdTextFont}" />
+                <Setter Property="FontSize" Value="13" />
+                <Setter Property="Cursor" Value="Hand" />
+                <Setter Property="Foreground" Value="{DynamicResource OnSurfaceVariantBrush}" />
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="RadioButton">
+                            <Grid>
+                                <Border x:Name="Pill"
+                                        CornerRadius="18"
+                                        Background="Transparent"
+                                        BorderBrush="{DynamicResource OutlineBrush}"
+                                        BorderThickness="1"
+                                        Padding="{TemplateBinding Padding}" />
+                                <Border x:Name="StateLayer"
+                                        CornerRadius="18"
+                                        Background="{DynamicResource OnSurfaceBrush}"
+                                        Opacity="0" />
+                                <ContentPresenter HorizontalAlignment="Center"
+                                                  VerticalAlignment="Center"
+                                                  Margin="{TemplateBinding Padding}" />
+                            </Grid>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Trigger.EnterActions>
+                                        <BeginStoryboard Storyboard="{StaticResource MdStateHoverIn}" />
+                                    </Trigger.EnterActions>
+                                    <Trigger.ExitActions>
+                                        <BeginStoryboard Storyboard="{StaticResource MdStateHoverOut}" />
+                                    </Trigger.ExitActions>
+                                </Trigger>
+                                <Trigger Property="IsChecked" Value="True">
+                                    <Setter TargetName="Pill" Property="Background"
+                                            Value="{DynamicResource PrimaryBrush}" />
+                                    <Setter TargetName="Pill" Property="BorderBrush"
+                                            Value="{DynamicResource PrimaryBrush}" />
+                                    <Setter Property="Foreground"
+                                            Value="{DynamicResource OnPrimaryBrush}" />
+                                    <Setter Property="FontWeight" Value="SemiBold" />
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
         </ResourceDictionary>
     </Application.Resources>
 </Application>
